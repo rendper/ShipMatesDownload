@@ -1,47 +1,38 @@
-# 🚀 Shipmates
+🚀 Shipmates
+An online multiplayer social deduction game built in Python using Tkinter and WebSockets, connecting players live across the globe!
 
-**Shipmates** is a custom-built online multiplayer social deduction game inspired by *Among Us*, developed using **Python**, **Tkinter**, **FastAPI**, and **WebSockets**. 
-
-Play online with friends across the world without messing around with complicated local network setups or port forwarding—hosted effortlessly on **Render**!
-
----
-
-## ✨ Features
-
-* **🌐 True Online Multiplayer:** Connects live via WebSockets hosted in the cloud.
-* **🕵️ Random Roles:** Automatically assigns secret roles (**Crewmate** or **Impostor**) upon joining.
-* **👁️ Fog-of-War Vision:** Limited vision system so you can only see rooms and corridors immediately around your character.
-* **⚡ Interactive Tasks:** Complete interactive wire-matching puzzles to win as a crewmate.
-* **🔪 Kill & Report Mechanics:** Impostors can eliminate players, leaving behind dead bodies that other crewmates can report.
-* **🚨 Emergency Meetings:** Trigger meetings to debate suspects and chat.
-* **💬 Built-in Live Text Chat:** Press **T** anytime in-game to chat live with other players across different PCs.
-* **👤 Username & Avatar Customization:** Pick your custom username and color before launching into the ship.
-
----
-
-## 📁 Repository Structure
-
-To host and run the game, your repository should contain:
-* `server.py` — The FastAPI & WebSocket backend server.
-* `requirements.txt` — Python dependencies for the server (`fastapi`, `uvicorn`, `websockets`).
-* `shipmates.py` — The local Python/Tkinter game client running on players' PCs.
-
----
-
-## 🛠️ Setup Instructions
-
-### Part 1: Deploy the Backend Server (Render)
-1. Create a new public repository on GitHub and upload `server.py` and `requirements.txt`.
-2. Go to [Render](https://dashboard.render.com/), click **New +** -> **Web Service**, and connect your repository.
-3. Configure your service:
-   * **Language:** Python 3
-   * **Build Command:** `pip install -r requirements.txt`
-   * **Start Command:** `python server.py`
-   * **Plan:** Free
-4. Once live, copy your public URL (e.g., `https://your-app-name.onrender.com`).
-
-### Part 2: Set Up and Run the Game Client
-1. Make sure you have Python installed on your PC.
-2. Open your terminal/command prompt and install the required websocket client package:
-   ```bash
+🎮 How to Play
+1. Download the Game: Download the shipmates.py file directly from this repository.
+2. Install Dependencies: Open your terminal or command prompt and run:
    pip install websocket-client
+   (If pip gives an error, try python -m pip install websocket-client)
+3. Launch the Game: Run the script using Python:
+   python shipmates.py
+4. Join the Lobby: Type your username, press C to cycle through avatar colors, hit Enter, and dive straight into the game online!
+
+🕹️ Controls
+- Movement: WASD or Arrow Keys
+- Live Chat: Press T to start typing, hit Enter to send
+- Fix Tasks: Press E near yellow task spots (Crewmates)
+- Impostor Kill: Press Spacebar (or click the KILL button)
+- Report Dead Body: Press R (or click the REPORT button near a body)
+- Cancel / Menu: Escape
+
+📢 Patch Notes & Changelog
+
+🚀 Update 1.2 — Server & Stability Overhaul
+- Ghost Player Fix: Fixed a major bug where disconnected players lingered on the map as "ghosts".
+- Username-Based Player IDs: Replaced randomized temporary IDs with unique username session tracking. Logging back in after a drop now instantly restores your slot without duplicating your avatar.
+- Crash Prevention: Resolved an issue where reporting a dead body with out-of-sync player states caused game client crashes.
+- Streamlined UI: Safely capped voting screen player lists to prevent canvas rendering overflows.
+
+🌟 Update 1.1 — Social & Quality of Life
+- In-Game Text Chat: Added live chat box at the bottom of the canvas—press T anytime to talk with crewmates.
+- Custom Usernames: Enabled custom username selection directly from the main menu.
+- Dynamic Role System: Implemented server-side role assignment for Crewmates and Impostors.
+- Live Cloud Deployment: Connected client directly to the Render WebSocket server (wss://crewserver.onrender.com/ws).
+
+🛠️ Update 1.0 — Initial Release
+- Basic movement, map collision detection, and fog-of-war vision.
+- Interactive wire repair task minigame.
+- Impostor kill and body report mechanics.
