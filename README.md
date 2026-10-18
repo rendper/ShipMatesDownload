@@ -9,7 +9,9 @@ An online multiplayer social deduction game built in Python using Tkinter and We
 3. Launch the Game: Run the script using Python:
    python shipmates.py
 4. Join the Lobby: Type your username, press C to cycle through avatar colors, hit Enter, and dive straight into the game online!
-
+-----------------------------VC-------------------------------------
+   Shipmates got voice chat now But you need to install something
+   windows 1.Press win+R 2.Type in cmd 3. put in this : "py -m pip install sounddevice numpy"
 🕹️ Controls
 - Movement: WASD or Arrow Keys
 - Live Chat: Press T to start typing, hit Enter to send
