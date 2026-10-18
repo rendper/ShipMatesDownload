@@ -1,6 +1,8 @@
 🚀 Shipmates
 An online multiplayer social deduction game built in Python using Tkinter and WebSockets, connecting players live across the globe!
 
+Youtube : https://www.youtube.com/@wemadeshipmates/
+
 🎮 How to Play
 1. Download the Game: Download the shipmates.py file directly from this repository.
 2. Install Dependencies: Open your terminal or command prompt and run:
