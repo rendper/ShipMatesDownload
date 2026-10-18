@@ -8,6 +8,7 @@ import base64
 import sounddevice as sd
 import numpy as np
 
+# Make sure this matches your exact Render URL
 WS_URL = "wss://crewserver.onrender.com/ws"
 
 TILE = 28
@@ -15,7 +16,7 @@ COLS, ROWS = 32, 20
 WIDTH, HEIGHT = COLS * TILE, ROWS * TILE + 80
 VISION = 5.5
 
-# --- GLOBAL VOICE CHAT SETUP ---
+# --- GLOBAL VOICE CHAT SETUP (UDP / Cloud WebSocket Relay) ---
 voice_enabled = True
 audio_active = True
 
@@ -23,7 +24,6 @@ def record_and_send_audio(ws_conn, p_id):
     def callback(indata, frames, time, status):
         if not voice_enabled or not audio_active: return
         try:
-            # Convert audio chunk to base64 string to transmit safely over WebSocket
             audio_bytes = indata.astype(np.float32).tobytes()
             b64_audio = base64.b64encode(audio_bytes).decode('utf-8')
             payload = json.dumps({"action": "voice", "sender": p_id, "audio": b64_audio})
@@ -36,7 +36,7 @@ def record_and_send_audio(ws_conn, p_id):
         stream = sd.InputStream(samplerate=8000, channels=1, callback=callback, blocksize=2048)
         stream.start()
     except Exception as e:
-        print("Mic initialization error:", e)
+        print("Mic initialization note (audio optional):", e)
 
 def play_incoming_audio(b64_audio):
     if not voice_enabled or not audio_active: return
@@ -46,10 +46,10 @@ def play_incoming_audio(b64_audio):
         sd.play(audio_data, 8000)
     except:
         pass
-# -------------------------------
+# -----------------------------------------------------------
 
 root = tk.Tk()
-root.title("Shipmates - Online with Global Voice & Text")
+root.title("Shipmates - Full Online Multiplayer Edition")
 root.resizable(False, False)
 canvas = tk.Canvas(root, width=WIDTH, height=HEIGHT, bg="#101827", highlightthickness=0)
 canvas.pack()
@@ -66,7 +66,6 @@ keys = set()
 player_id = username
 player = {"x": 4, "y": 4, "color": COLORS[0][1], "name": username}
 other_players = {}
-bots = []
 tasks = set()
 bodies = []
 chat_messages = []
@@ -86,7 +85,7 @@ ws = None
 def connect_ws():
     global ws
     def on_message(ws_conn, message_str):
-        global other_players, bots, tasks, bodies, meeting_active, votes, message, chat_messages, role
+        global other_players, tasks, bodies, meeting_active, votes, message, chat_messages, role, voted
         try:
             data = json.loads(message_str)
             if data.get("action") == "voice":
@@ -100,8 +99,13 @@ def connect_ws():
                     role = data["players"][player_id].get("role", "Crewmate")
             if "bodies" in data:
                 bodies = data["bodies"]
+            
+            old_meeting = meeting_active
             if "meeting" in data:
                 meeting_active = data["meeting"]
+                if old_meeting and not meeting_active:
+                    voted = False  # Reset vote state when meeting ends
+
             if "votes" in data:
                 votes = data["votes"]
             if "chat" in data:
@@ -114,7 +118,6 @@ def connect_ws():
     try:
         ws = websocket.WebSocketApp(WS_URL, on_message=on_message)
         threading.Thread(target=ws.run_forever, daemon=True).start()
-        # Start recording mic data once connected
         threading.Thread(target=record_and_send_audio, args=(ws, player_id), daemon=True).start()
     except Exception as e:
         print("Could not connect:", e)
@@ -173,8 +176,71 @@ def send_state():
         except:
             pass
 
+def click_handler(event):
+    global task_game, meeting_active, votes, voted
+    mx, my = event.x, event.y
+
+    if screen == "game":
+        if role == "Impostor" and not meeting_active and not typing_chat:
+            x1, y1, x2, y2 = kill_btn
+            if x1 <= mx <= x2 and y1 <= my <= y2:
+                for pid, pdata in other_players.items():
+                    if abs(player["x"] - pdata["x"]) + abs(player["y"] - pdata["y"]) <= 1:
+                        new_body = {"x": pdata["x"], "y": pdata["y"], "color": pdata["color"], "name": pid}
+                        bodies.append(new_body)
+                        if ws and ws.sock and ws.sock.connected:
+                            ws.send(json.dumps({"action": "kill", "target": pid, "body": new_body}))
+                        break
+                return
+        if not meeting_active and not typing_chat:
+            x1, y1, x2, y2 = report_btn
+            if x1 <= mx <= x2 and y1 <= my <= y2:
+                for b in bodies:
+                    if abs(player["x"] - b["x"]) + abs(player["y"] - b["y"]) <= 3:
+                        meeting_active = True
+                        votes = {}
+                        voted = False
+                        if ws and ws.sock and ws.sock.connected:
+                            ws.send(json.dumps({"action": "report", "body": b}))
+                        break
+                return
+
+    if meeting_active and not voted:
+        all_p = list(other_players.values()) + [{"name": player["name"], "id": player_id}]
+        for idx, pdata in enumerate(all_p[:6]):
+            vy = 140 + idx * 40
+            if 200 <= mx <= WIDTH - 200 and vy <= my <= vy + 30:
+                target_name = pdata.get("name", "Player")
+                votes[player_id] = target_name
+                voted = True
+                if ws and ws.sock and ws.sock.connected:
+                    ws.send(json.dumps({"action": "vote", "voter": player_id, "target": target_name}))
+                break
+
+    if task_game:
+        for i, col in enumerate(task_game["left"]):
+            wy = 160 + i * 50
+            if 220 <= mx <= 244 and wy - 12 <= my <= wy + 12:
+                task_game["selected"] = i
+                return
+        if task_game["selected"] is not None:
+            left_idx = task_game["selected"]
+            left_color = task_game["left"][left_idx]
+            for j, col in enumerate(task_game["right"]):
+                wy = 160 + j * 50
+                if 550 <= mx <= 574 and wy - 12 <= my <= wy + 12:
+                    if col == left_color:
+                        task_game["connected"][left_idx] = j
+                        task_game["selected"] = None
+                        if len(task_game["connected"]) == 4:
+                            tasks.remove(task_game["pos"])
+                            task_game = None
+                    break
+
+root.bind("<Button-1>", click_handler)
+
 def key_down(event):
-    global screen, color_index, username, typing_chat, chat_input_text, task_game, meeting_active, votes, voted, voice_enabled
+    global screen, color_index, username, typing_chat, chat_input_text, task_game, voice_enabled
     k = event.keysym
 
     if screen == "menu":
@@ -209,7 +275,7 @@ def key_down(event):
 
     if k_lower == "t":
         typing_chat = True
-    elif k_lower == "m":  # Press M to Mute/Unmute Voice Chat
+    elif k_lower == "m":
         voice_enabled = not voice_enabled
     elif k_lower == "escape":
         screen = "menu"
@@ -237,6 +303,7 @@ def key_down(event):
         elif k_lower == "r":
             for b in bodies:
                 if abs(player["x"] - b["x"]) + abs(player["y"] - b["y"]) <= 3:
+                    global meeting_active, votes, voted
                     meeting_active = True
                     votes = {}
                     voted = False
@@ -294,8 +361,20 @@ def draw_map():
 
     draw_crew(px, py, player["color"], player["name"])
 
+def draw_meeting():
+    canvas.create_rectangle(150, 60, WIDTH-150, HEIGHT-60, fill="#182738", outline="white", width=2)
+    canvas.create_text(WIDTH//2, 90, text="EMERGENCY MEETING - CLICK TO VOTE", fill="white", font=("Arial", 14, "bold"))
+    
+    all_p = list(other_players.values()) + [{"name": player["name"]}]
+    for idx, pdata in enumerate(all_p[:6]):
+        vy = 140 + idx * 40
+        name = pdata.get("name", "Player")
+        is_voted_status = " (VOTED)" if name in votes.values() else ""
+        canvas.create_rectangle(200, vy, WIDTH-200, vy+30, fill="#243b52", outline="white")
+        canvas.create_text(WIDTH//2, vy+15, text=f"Vote: {name}{is_voted_status}", fill="white", font=("Arial", 11, "bold"))
+
 def update():
-    global screen, message
+    global screen
 
     if screen == "menu":
         canvas.delete("all")
@@ -316,16 +395,20 @@ def update():
 
         if task_game:
             canvas.create_rectangle(200, 80, 600, 380, fill="#182738", outline="white", width=2)
-            canvas.create_text(400, 110, text="FIX WIRES", fill="white", font=("Arial", 13, "bold"))
+            canvas.create_text(400, 110, text="FIX WIRES: Click matching color dots", fill="white", font=("Arial", 13, "bold"))
             for i, col in enumerate(task_game["left"]):
                 wy = 160 + i * 50
-                canvas.create_oval(220, wy-12, 244, wy+12, fill=col, outline="white", width=2)
+                sel = task_game["selected"] == i
+                canvas.create_oval(220, wy-12, 244, wy+12, fill=col, outline="yellow" if sel else "white", width=2)
             for j, col in enumerate(task_game["right"]):
                 wy = 160 + j * 50
                 canvas.create_oval(550, wy-12, 574, wy+12, fill=col, outline="white", width=2)
 
+        if meeting_active:
+            draw_meeting()
+
         canvas.create_rectangle(0, HEIGHT-80, WIDTH, HEIGHT, fill="#0b121e", outline="")
-        voice_status = "ON (Press M to Mute)" if voice_enabled else "MUTED"
+        voice_status = "ON (Press M)" if voice_enabled else "MUTED"
         status_txt = f"Role: {role} | Tasks: {len(tasks)} | 🎙️ Voice: {voice_status}"
         canvas.create_text(12, HEIGHT-65, anchor="w", text=status_txt, fill="white", font=("Arial", 10, "bold"))
 
